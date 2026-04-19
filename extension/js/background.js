@@ -105,6 +105,114 @@ async function fetchGmail() {
   }
 }
 
+// Send Meeting Invitation Email
+async function sendMeetingInvite(to, subject, dateTime, duration, message) {
+  try {
+    const token = await getToken();
+    
+    // Create the email body
+    const emailBody = `
+Dear ${to.split('@')[0]},
+
+${message}
+
+Meeting Details:
+- Date & Time: ${dateTime}
+- Duration: ${duration} minutes
+- Video Call: https://meet.google.com/new
+
+Please click the link below to accept or decline this meeting:
+
+ACCEPT: https://calendar.google.com/calendar/r/eventedit
+DECLINE: https://calendar.google.com/calendar/r/eventedit
+
+Best regards,
+Your Colleague
+    `;
+
+    // Create raw message (base64 encoded email)
+    const email = [
+      'From: me',
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'Content-Type: text/html; charset=utf-8',
+      '',
+      emailBody
+    ].join('\n');
+
+    const base64email = btoa(unescape(encodeURIComponent(email)));
+
+    // Send via Gmail API
+    const response = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        raw: base64email
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gmail Send Error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ Meeting invitation sent:', result);
+    return { success: true, messageId: result.id };
+  } catch (err) {
+    console.error('❌ Error sending meeting invite:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+// Create Calendar Event (ADD TO USER'S CALENDAR)
+async function createCalendarEvent(title, description, startDateTime, endDateTime, guestEmail) {
+  try {
+    const token = await getToken();
+    
+    const event = {
+      summary: title,
+      description: description,
+      start: {
+        dateTime: startDateTime,
+        timeZone: 'UTC'
+      },
+      end: {
+        dateTime: endDateTime,
+        timeZone: 'UTC'
+      },
+      attendees: [
+        {
+          email: guestEmail,
+          responseStatus: 'needsAction'
+        }
+      ]
+    };
+
+    const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(event)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Calendar Create Error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ Calendar event created:', result);
+    return { success: true, eventId: result.id };
+  } catch (err) {
+    console.error('❌ Error creating calendar event:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 // Message listener (MAIN BRIDGE)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_DATA") {
@@ -119,6 +227,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ error: err.toString(), calendar: { items: [] }, gmail: { messages: [] } });
       });
 
+    return true;
+  } else if (message.type === "SEND_MEETING_INVITE") {
+    console.log("SEND_MEETING_INVITE request received");
+    const { to, subject, dateTime, duration, message: msg } = message;
+    sendMeetingInvite(to, subject, dateTime, duration, msg)
+      .then(result => sendResponse(result))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    
+    return true;
+  } else if (message.type === "CREATE_CALENDAR_EVENT") {
+    console.log("CREATE_CALENDAR_EVENT request received");
+    const { title, description, startDateTime, endDateTime, guestEmail } = message;
+    createCalendarEvent(title, description, startDateTime, endDateTime, guestEmail)
+      .then(result => sendResponse(result))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    
+    return true;
+  } else if (message.type === "OPEN_TAB") {
+    console.log("OPEN_TAB request received:", message.url);
+    chrome.tabs.create({ url: message.url }, (tab) => {
+      console.log("New tab created:", tab.id);
+      sendResponse({ success: true, tabId: tab.id });
+    });
     return true;
   }
 });

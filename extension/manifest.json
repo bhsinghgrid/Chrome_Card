@@ -7,7 +7,8 @@
     "storage",
     "identity",
     "activeTab",
-    "scripting"
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
     "https://www.googleapis.com/*"
@@ -35,7 +36,9 @@
     "client_id": "542366028313-doo2p284e48ppbtfgv5cb1ra00kv2fso.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/calendar.readonly",
-      "https://www.googleapis.com/auth/gmail.readonly"
+      "https://www.googleapis.com/auth/calendar",
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.send"
     ]
   }
 }

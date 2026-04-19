@@ -1,117 +1,7 @@
-// Wait for DOM to be ready
-function initializeExtension() {
-  console.log("Google Dashboard Extension initializing...");
-  
+// Helper function to setup button listeners
+function setupButtonListener(button, shadowRoot) {
   let sidebarOpen = false;
-
-  // Add global styles for animations
-  const globalStyle = document.createElement("style");
-  globalStyle.innerHTML = `
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes slideOut {
-      from { transform: translateX(0); opacity: 1; }
-      to { transform: translateX(100%); opacity: 0; }
-    }
-    
-    /* Responsive adjustments for sidebar */
-    body, html {
-      transition: margin-right 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
-      overflow-wrap: break-word;
-      word-wrap: break-word;
-    }
-    
-    html {
-      width: 100%;
-      height: 100%;
-    }
-    
-    body {
-      width: 100%;
-    }
-    
-    @media (max-width: 480px) {
-      #google-dashboard-button {
-        width: 45px !important;
-        height: 45px !important;
-        right: 10px !important;
-        bottom: 10px !important;
-        font-size: 20px !important;
-      }
-      
-      body, html {
-        transition: margin-right 0.3s ease !important;
-      }
-    }
-  `;
-  if (document.head) {
-    document.head.appendChild(globalStyle);
-  }
-
-  // Create toggle button with premium styling
-  const button = document.createElement("button");
-  button.id = "google-dashboard-button";
-  button.innerText = "☰";
-  button.style.position = "fixed";
-  button.style.right = "20px";
-  button.style.bottom = "20px";
-  button.style.zIndex = "2147483647"; // Maximum z-index
-  button.style.width = "50px";
-  button.style.height = "50px";
-  button.style.fontSize = "24px";
-  button.style.cursor = "pointer";
-  button.style.backgroundColor = "#4285F4";
-  button.style.color = "white";
-  button.style.border = "none";
-  button.style.borderRadius = "50%";
-  button.style.boxShadow = "0 4px 12px rgba(66, 133, 244, 0.4)";
-  button.style.transition = "all 0.3s ease";
-  button.style.fontWeight = "bold";
-  button.style.display = "flex";
-  button.style.alignItems = "center";
-  button.style.justifyContent = "center";
-  button.style.padding = "0";
-  button.style.margin = "0";
-  button.style.pointerEvents = "auto";
-  button.style.visibility = "visible";
-  button.style.opacity = "1";
-  button.setAttribute("data-extension", "google-dashboard");
-
-  button.onmouseover = () => {
-    button.style.backgroundColor = "#3367D6";
-    button.style.boxShadow = "0 6px 16px rgba(66, 133, 244, 0.6)";
-    button.style.transform = "scale(1.1)";
-  };
-
-  button.onmouseout = () => {
-    button.style.backgroundColor = "#4285F4";
-    button.style.boxShadow = "0 4px 12px rgba(66, 133, 244, 0.4)";
-    button.style.transform = "scale(1)";
-  };
-
-  // Add button to page - retry if body isn't ready
-  const addButtonToDom = () => {
-    if (document.body) {
-      try {
-        document.body.appendChild(button);
-        console.log("✅ Button successfully added to page");
-      } catch (err) {
-        console.error("Error appending button:", err);
-      }
-    } else {
-      // Retry if body doesn't exist yet
-      setTimeout(addButtonToDom, 100);
-    }
-  };
   
-  addButtonToDom();
-
   button.onclick = () => {
     if (sidebarOpen) {
       const sidebar = document.getElementById("google-sidebar");
@@ -154,15 +44,440 @@ function initializeExtension() {
       overlay.style.zIndex = "999997";
       overlay.style.animation = "fadeIn 0.3s ease";
       overlay.style.backdropFilter = "blur(2px)";
-      overlay.onclick = () => button.onclick(); // Close on overlay click
+      overlay.onclick = () => button.onclick();
       document.body.appendChild(overlay);
       
-      createSidebar();
+      if (window.createSidebar) {
+        window.createSidebar(button);
+      } else {
+        console.error("❌ createSidebar not available yet");
+      }
       sidebarOpen = true;
     }
   };
+  
+  button.onmouseover = () => {
+    button.style.backgroundColor = "#3367D6";
+    button.style.boxShadow = "0 6px 16px rgba(66, 133, 244, 0.6)";
+    button.style.transform = "scale(1.1)";
+  };
 
-  function createSidebar() {
+  button.onmouseout = () => {
+    button.style.backgroundColor = "#4285F4";
+    button.style.boxShadow = "0 4px 12px rgba(66, 133, 244, 0.4)";
+    button.style.transform = "scale(1)";
+  };
+}
+
+// Global functions for sidebar interactions
+window.switchTab = function(tab) {
+  const dashboardTab = document.getElementById('dashboard-tab');
+  const settingsTab = document.getElementById('settings-tab');
+  const buttons = document.querySelectorAll('.tab-btn');
+  
+  if (dashboardTab && settingsTab && buttons.length >= 2) {
+    dashboardTab.classList.remove('active');
+    settingsTab.classList.remove('active');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    
+    if (tab === 'dashboard') {
+      dashboardTab.classList.add('active');
+      buttons[0].classList.add('active');
+    } else if (tab === 'settings') {
+      settingsTab.classList.add('active');
+      buttons[1].classList.add('active');
+    }
+  }
+};
+
+window.refreshData = function() {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳ Refreshing...';
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.textContent = '🔄 Refresh Now';
+    window.loadData();
+    const lastUpdated = document.getElementById('last-updated');
+    if (lastUpdated) lastUpdated.textContent = 'Just now';
+  }, 800);
+};
+
+window.clearCache = function() {
+  chrome.storage.local.clear(() => {
+    window.loadData();
+  });
+};
+
+window.logout = function() {
+  chrome.identity.clearAllCachedAuthTokens(() => {
+    chrome.storage.local.clear(() => {
+      window.location.reload();
+    });
+  });
+};
+
+window.openCalendarLink = function() {
+  const email = document.getElementById('calendar-email-input').value.trim();
+  const errorDiv = document.getElementById('calendar-error');
+  const successDiv = document.getElementById('calendar-success');
+  
+  // Hide both messages initially
+  if (errorDiv) errorDiv.style.display = 'none';
+  if (successDiv) successDiv.style.display = 'none';
+  
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email) {
+    if (errorDiv) {
+      errorDiv.textContent = '❌ Please enter an email address';
+      errorDiv.style.display = 'block';
+    }
+    return;
+  }
+  
+  if (!emailRegex.test(email)) {
+    if (errorDiv) {
+      errorDiv.textContent = '❌ Invalid email format. Please use format: person@gmail.com';
+      errorDiv.style.display = 'block';
+    }
+    return;
+  }
+  
+  // Generate Google Calendar link
+  const calendarLink = `https://calendar.google.com/calendar/u/0?cid=${encodeURIComponent(email)}`;
+  
+  // Show success message with link
+  if (successDiv) {
+    successDiv.innerHTML = `
+      <div style="margin-bottom: 8px; font-weight: 600;">✅ Calendar link generated!</div>
+      <div style="margin-bottom: 10px; font-size: 11px; opacity: 0.9;">Opening calendar for: <strong>${email}</strong></div>
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <a href="${calendarLink}" target="_blank" style="flex: 1; padding: 8px 12px; background: rgba(52, 168, 83, 0.3); border: 1px solid rgba(52, 168, 83, 0.5); color: #4ade80; border-radius: 6px; text-decoration: none; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;" onmouseover="this.style.background='rgba(52, 168, 83, 0.5)'" onmouseout="this.style.background='rgba(52, 168, 83, 0.3)'">
+          🔗 Open Calendar →
+        </a>
+      </div>
+    `;
+    successDiv.style.display = 'block';
+    
+    // Clear input
+    document.getElementById('calendar-email-input').value = '';
+    
+    // Also open in new tab automatically
+    chrome.runtime.sendMessage({ type: "OPEN_TAB", url: calendarLink }, (response) => {
+      if (response && response.success) {
+        console.log("✅ Calendar opened in new tab");
+      }
+    });
+  }
+};
+
+// Send Meeting Invitation
+window.sendMeetingInvite = function() {
+  const email = document.getElementById('meeting-email-input').value.trim();
+  const title = document.getElementById('meeting-title-input').value.trim();
+  const date = document.getElementById('meeting-date-input').value;
+  const time = document.getElementById('meeting-time-input').value;
+  const duration = document.getElementById('meeting-duration-input').value;
+  const message = document.getElementById('meeting-message-input').value.trim();
+  
+  const errorDiv = document.getElementById('meeting-error');
+  const successDiv = document.getElementById('meeting-success');
+  const btn = document.getElementById('send-meeting-invite-btn');
+  
+  // Hide both messages initially
+  if (errorDiv) errorDiv.style.display = 'none';
+  if (successDiv) successDiv.style.display = 'none';
+  
+  // Validate inputs
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
+  if (!email) {
+    if (errorDiv) {
+      errorDiv.textContent = '❌ Please enter their email address';
+      errorDiv.style.display = 'block';
+    }
+    return;
+  }
+  
+  if (!emailRegex.test(email)) {
+    if (errorDiv) {
+      errorDiv.textContent = '❌ Invalid email format';
+      errorDiv.style.display = 'block';
+    }
+    return;
+  }
+  
+  if (!title) {
+    if (errorDiv) {
+      errorDiv.textContent = '❌ Please enter a meeting title';
+      errorDiv.style.display = 'block';
+    }
+    return;
+  }
+  
+  if (!date || !time) {
+    if (errorDiv) {
+      errorDiv.textContent = '❌ Please select date and time';
+      errorDiv.style.display = 'block';
+    }
+    return;
+  }
+  
+  if (!duration || duration < 15 || duration > 480) {
+    if (errorDiv) {
+      errorDiv.textContent = '❌ Duration must be between 15-480 minutes';
+      errorDiv.style.display = 'block';
+    }
+    return;
+  }
+  
+  if (!message) {
+    if (errorDiv) {
+      errorDiv.textContent = '❌ Please write a message';
+      errorDiv.style.display = 'block';
+    }
+    return;
+  }
+  
+  // Show loading state
+  btn.disabled = true;
+  btn.textContent = '⏳ Sending...';
+  
+  // Calculate end time
+  const startDateTime = `${date}T${time}:00Z`;
+  const startDate = new Date(startDateTime);
+  const endDate = new Date(startDate.getTime() + duration * 60000);
+  const endDateTime = endDate.toISOString();
+  
+  // Format date/time for email
+  const dateTimeFormatted = new Date(startDate).toLocaleString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  // Send meeting invitation
+  const inviteSubject = `Meeting: ${title}`;
+  const inviteMessage = `${message}\n\nMeeting: ${title}`;
+  
+  chrome.runtime.sendMessage({
+    type: "SEND_MEETING_INVITE",
+    to: email,
+    subject: inviteSubject,
+    dateTime: dateTimeFormatted,
+    duration: duration,
+    message: inviteMessage
+  }, (response) => {
+    if (response && response.success) {
+      // Now create calendar event
+      chrome.runtime.sendMessage({
+        type: "CREATE_CALENDAR_EVENT",
+        title: title,
+        description: inviteMessage,
+        startDateTime: startDateTime,
+        endDateTime: endDateTime,
+        guestEmail: email
+      }, (calendarResponse) => {
+        btn.disabled = false;
+        btn.textContent = '📧 Send Invitation';
+        
+        if (calendarResponse && calendarResponse.success) {
+          if (successDiv) {
+            successDiv.innerHTML = `
+              <div style="margin-bottom: 8px; font-weight: 600;">✅ Meeting invitation sent!</div>
+              <div style="margin-bottom: 4px; font-size: 11px; opacity: 0.9;">Email sent to: <strong>${email}</strong></div>
+              <div style="font-size: 11px; opacity: 0.8;">📅 ${dateTimeFormatted} (${duration} mins)</div>
+              <div style="margin-top: 8px; font-size: 11px; font-style: italic; color: #cbd5e1;">They can accept or decline the invitation. The meeting will be added to their calendar once they accept.</div>
+            `;
+            successDiv.style.display = 'block';
+          }
+          
+          // Clear form
+          document.getElementById('meeting-email-input').value = '';
+          document.getElementById('meeting-title-input').value = '';
+          document.getElementById('meeting-date-input').value = '';
+          document.getElementById('meeting-time-input').value = '';
+          document.getElementById('meeting-duration-input').value = '30';
+          document.getElementById('meeting-message-input').value = '';
+        } else {
+          if (errorDiv) {
+            errorDiv.textContent = `❌ Email sent but calendar error: ${calendarResponse.error}`;
+            errorDiv.style.display = 'block';
+          }
+        }
+      });
+    } else {
+      btn.disabled = false;
+      btn.textContent = '📧 Send Invitation';
+      if (errorDiv) {
+        errorDiv.textContent = `❌ Failed to send invitation: ${response.error}`;
+        errorDiv.style.display = 'block';
+      }
+    }
+  });
+};
+
+// Wait for DOM to be ready
+function initializeExtension() {
+  console.log("Google Dashboard Extension initializing...");
+
+  // Add global styles with maximum force
+  const globalStyle = document.createElement("style");
+  globalStyle.innerHTML = `
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+    
+    /* CRITICAL: Button must be visible above everything */
+    #google-dashboard-button {
+      all: initial !important;
+      display: block !important;
+      position: fixed !important;
+      bottom: 20px !important;
+      right: 20px !important;
+      width: 50px !important;
+      height: 50px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: none !important;  
+      border-radius: 50% !important;
+      background: #4285F4 !important;
+      color: white !important;
+      font-size: 24px !important;
+      line-height: 50px !important;
+      text-align: center !important;
+      font-weight: bold !important;
+      cursor: pointer !important;
+      z-index: 2147483647 !important;
+      box-shadow: 0 4px 12px rgba(66, 133, 244, 0.4) !important;
+      transition: all 0.3s ease !important;
+      pointer-events: auto !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      font-family: Arial, sans-serif !important;
+      box-sizing: content-box !important;
+      -webkit-box-shadow: 0 4px 12px rgba(66, 133, 244, 0.4) !important;
+    }
+    
+    #google-dashboard-button:hover {
+      background: #3367D6 !important;
+      box-shadow: 0 6px 16px rgba(66, 133, 244, 0.6) !important;
+      -webkit-box-shadow: 0 6px 16px rgba(66, 133, 244, 0.6) !important;
+      transform: scale(1.1) !important;
+    }
+    
+    #google-dashboard-button:active {
+      transform: scale(0.95) !important;
+    }
+    
+    @media (max-width: 480px) {
+      #google-dashboard-button {
+        bottom: 10px !important;
+        right: 10px !important;
+        width: 45px !important;
+        height: 45px !important;
+        font-size: 20px !important;
+        line-height: 45px !important;
+      }
+    }
+  `;
+  
+  try {
+    document.head.appendChild(globalStyle);
+    console.log("✅ Global styles added");
+  } catch (err) {
+    console.error("❌ Error adding styles:", err);
+    document.documentElement.appendChild(globalStyle);
+  }
+
+  // Create button
+  const button = document.createElement("button");
+  button.id = "google-dashboard-button";
+  button.textContent = "☰";
+  button.setAttribute("title", "Google Dashboard");
+  button.setAttribute("aria-label", "Google Dashboard");
+  button.style.cssText = `
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    width: 50px !important;
+    height: 50px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 50% !important;
+    background: #4285F4 !important;
+    color: white !important;
+    font-size: 24px !important;
+    font-weight: bold !important;
+    cursor: pointer !important;
+    z-index: 2147483647 !important;
+    box-shadow: 0 4px 12px rgba(66, 133, 244, 0.4) !important;
+    transition: all 0.3s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    pointer-events: auto !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  `;
+
+  const addButton = () => {
+    if (!document.body) {
+      setTimeout(addButton, 100);
+      return;
+    }
+    
+    if (!document.getElementById("google-dashboard-button")) {
+      document.body.appendChild(button);
+      setupButtonListener(button, null);
+      console.log("✅ Button added to page!");
+      console.log("📍 Button ID: google-dashboard-button");
+      console.log("📍 Position: bottom-right (20px from edges)");
+      console.log("📍 Z-index: 2147483647 (maximum)");
+    }
+  };
+  
+  addButton();
+  
+  // Protect button with MutationObserver
+  try {
+    const observer = new MutationObserver(() => {
+      const btn = document.getElementById("google-dashboard-button");
+      if (!btn && document.body) {
+        console.log("🔄 Button was removed, restoring...");
+        const newBtn = document.createElement("button");
+        newBtn.id = "google-dashboard-button";
+        newBtn.textContent = "☰";
+        newBtn.setAttribute("title", "Google Dashboard");
+        newBtn.style.cssText = button.style.cssText;
+        document.body.appendChild(newBtn);
+        setupButtonListener(newBtn, null);
+      }
+    });
+    
+    observer.observe(document.body || document.documentElement, {
+      childList: true,
+      subtree: false
+    });
+    console.log("✅ Button protection enabled");
+  } catch (err) {
+    console.log("⚠️ Could not setup protection:", err);
+  }
+
+  function createSidebar(button) {
     const sidebar = document.createElement("div");
     sidebar.id = "google-sidebar";
     sidebar.style.position = "fixed";
@@ -668,8 +983,8 @@ function initializeExtension() {
       
       <!-- Tab Navigation -->
       <div class="tab-nav">
-        <button class="tab-btn active" onclick="switchTab('dashboard')">📅 Dashboard</button>
-        <button class="tab-btn" onclick="switchTab('settings')">⚙️ Settings</button>
+        <button class="tab-btn active">📅 Dashboard</button>
+        <button class="tab-btn">⚙️ Settings</button>
       </div>
       
       <!-- Dashboard Tab -->
@@ -719,6 +1034,120 @@ function initializeExtension() {
             </div>
           </div>
           
+          <div style="margin-bottom: 8px; margin-top: 20px; color: #60a5fa; font-weight: 600; font-size: 13px;">🔗 SHARED CALENDARS</div>
+          
+          <div class="settings-group" style="background: linear-gradient(135deg, rgba(96, 165, 250, 0.15) 0%, rgba(59, 130, 246, 0.1) 100%); padding: 16px !important; border-radius: 12px; border: 2px solid rgba(96, 165, 250, 0.3); margin-bottom: 16px;">
+            <div style="margin-bottom: 12px; color: #e2e8f0; font-size: 13px; font-weight: 600;">📊 View Any Google Calendar</div>
+            <div style="margin-bottom: 12px; color: #cbd5e1; font-size: 11px; line-height: 1.5;">
+              Enter someone's email address to view their shared Google Calendar. They must have their calendar publicly shared.
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div>
+                <input 
+                  type="email" 
+                  id="calendar-email-input" 
+                  placeholder="eg: person@gmail.com" 
+                  style="width: 100%; padding: 12px 14px; background: rgba(255,255,255,0.1); border: 2px solid rgba(96, 165, 250, 0.4); color: white; border-radius: 8px; font-size: 13px; transition: all 0.3s ease; box-sizing: border-box;"
+                  onfocus="this.style.background='rgba(96, 165, 250, 0.2)'; this.style.borderColor='rgba(96, 165, 250, 0.8)'"
+                  onblur="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='rgba(96, 165, 250, 0.4)'"
+                >
+              </div>
+              
+              <button 
+                style="width: 100%; padding: 12px 16px; background: linear-gradient(135deg, rgba(96, 165, 250, 0.5) 0%, rgba(59, 130, 246, 0.4) 100%); border: 2px solid rgba(96, 165, 250, 0.5); color: #60a5fa; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.5px;"
+                onmouseover="this.style.background='linear-gradient(135deg, rgba(96, 165, 250, 0.7), rgba(59, 130, 246, 0.6))'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(96, 165, 250, 0.3)'"
+                onmouseout="this.style.background='linear-gradient(135deg, rgba(96, 165, 250, 0.5), rgba(59, 130, 246, 0.4))'; this.style.transform='translateY(0)'; this.style.boxShadow='none'"
+              >
+                📅 Open Calendar
+              </button>
+            </div>
+            
+            <div id="calendar-error" style="color: #EF5350; font-size: 12px; margin-top: 10px; display: none; padding: 10px; background: rgba(239, 83, 80, 0.15); border-radius: 6px; border-left: 3px solid #EF5350;"></div>
+            <div id="calendar-success" style="color: #34A853; font-size: 12px; margin-top: 10px; display: none; padding: 10px; background: rgba(52, 168, 83, 0.15); border-radius: 6px; border-left: 3px solid #34A853;"></div>
+          </div>
+          
+          <div style="margin-bottom: 8px; margin-top: 20px; color: #60a5fa; font-weight: 600; font-size: 13px;">📞 SCHEDULE MEETING</div>
+          
+          <div class="settings-group" style="background: linear-gradient(135deg, rgba(234, 67, 53, 0.15) 0%, rgba(251, 188, 4, 0.1) 100%); padding: 16px !important; border-radius: 12px; border: 2px solid rgba(234, 67, 53, 0.3); margin-bottom: 16px;">
+            <div style="margin-bottom: 12px; color: #e2e8f0; font-size: 13px; font-weight: 600;">📅 Book a Meeting</div>
+            <div style="margin-bottom: 12px; color: #cbd5e1; font-size: 11px; line-height: 1.5;">
+              Schedule a meeting with someone. An invitation email will be sent to them with accept/decline options.
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div>
+                <label style="display: block; color: #cbd5e1; font-size: 11px; margin-bottom: 4px; font-weight: 600;">Their Email Address</label>
+                <input 
+                  type="email" 
+                  id="meeting-email-input" 
+                  placeholder="person@gmail.com" 
+                  style="width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.1); border: 2px solid rgba(234, 67, 53, 0.4); color: white; border-radius: 8px; font-size: 12px; box-sizing: border-box;"
+                >
+              </div>
+              
+              <div>
+                <label style="display: block; color: #cbd5e1; font-size: 11px; margin-bottom: 4px; font-weight: 600;">Meeting Title</label>
+                <input 
+                  type="text" 
+                  id="meeting-title-input" 
+                  placeholder="Project Discussion" 
+                  style="width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.1); border: 2px solid rgba(234, 67, 53, 0.4); color: white; border-radius: 8px; font-size: 12px; box-sizing: border-box;"
+                >
+              </div>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                  <label style="display: block; color: #cbd5e1; font-size: 11px; margin-bottom: 4px; font-weight: 600;">Date</label>
+                  <input 
+                    type="date" 
+                    id="meeting-date-input" 
+                    style="width: 100%; padding: 10px 8px; background: rgba(255,255,255,0.1); border: 2px solid rgba(234, 67, 53, 0.4); color: white; border-radius: 6px; font-size: 11px; box-sizing: border-box;"
+                  >
+                </div>
+                <div>
+                  <label style="display: block; color: #cbd5e1; font-size: 11px; margin-bottom: 4px; font-weight: 600;">Time</label>
+                  <input 
+                    type="time" 
+                    id="meeting-time-input" 
+                    style="width: 100%; padding: 10px 8px; background: rgba(255,255,255,0.1); border: 2px solid rgba(234, 67, 53, 0.4); color: white; border-radius: 6px; font-size: 11px; box-sizing: border-box;"
+                  >
+                </div>
+              </div>
+              
+              <div>
+                <label style="display: block; color: #cbd5e1; font-size: 11px; margin-bottom: 4px; font-weight: 600;">Duration (minutes)</label>
+                <input 
+                  type="number" 
+                  id="meeting-duration-input" 
+                  value="30" 
+                  min="15" 
+                  max="480" 
+                  style="width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.1); border: 2px solid rgba(234, 67, 53, 0.4); color: white; border-radius: 8px; font-size: 12px; box-sizing: border-box;"
+                >
+              </div>
+              
+              <div>
+                <label style="display: block; color: #cbd5e1; font-size: 11px; margin-bottom: 4px; font-weight: 600;">Message</label>
+                <textarea 
+                  id="meeting-message-input" 
+                  placeholder="Hi! I'd like to schedule a meeting with you..."
+                  style="width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.1); border: 2px solid rgba(234, 67, 53, 0.4); color: white; border-radius: 8px; font-size: 12px; box-sizing: border-box; resize: vertical; height: 60px; font-family: inherit;"
+                ></textarea>
+              </div>
+              
+              <button 
+                id="send-meeting-invite-btn"
+                style="width: 100%; padding: 12px 16px; background: linear-gradient(135deg, rgba(234, 67, 53, 0.5) 0%, rgba(251, 188, 4, 0.4) 100%); border: 2px solid rgba(234, 67, 53, 0.5); color: #fca5a5; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.5px;"
+              >
+                📧 Send Invitation
+              </button>
+            </div>
+            
+            <div id="meeting-error" style="color: #EF5350; font-size: 12px; margin-top: 10px; display: none; padding: 10px; background: rgba(239, 83, 80, 0.15); border-radius: 6px; border-left: 3px solid #EF5350;"></div>
+            <div id="meeting-success" style="color: #34A853; font-size: 12px; margin-top: 10px; display: none; padding: 10px; background: rgba(52, 168, 83, 0.15); border-radius: 6px; border-left: 3px solid #34A853;"></div>
+          </div>
+          
           <div style="margin-bottom: 8px; margin-top: 20px; color: #60a5fa; font-weight: 600; font-size: 13px;">ACCOUNT</div>
           
           <div class="settings-group">
@@ -736,12 +1165,12 @@ function initializeExtension() {
           </div>
           
           <div class="btn-group">
-            <button class="settings-btn" onclick="refreshData()">🔄 Refresh Now</button>
-            <button class="settings-btn" onclick="clearCache()">🗑️ Clear Cache</button>
+            <button class="settings-btn">🔄 Refresh Now</button>
+            <button class="settings-btn">🗑️ Clear Cache</button>
           </div>
           
           <div class="btn-group">
-            <button class="settings-btn" style="flex: 1;" onclick="logout()">🚪 Logout</button>
+            <button class="settings-btn" style="flex: 1;">🚪 Logout</button>
           </div>
           
           <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.08); color: #64748b; font-size: 11px; line-height: 1.5;">
@@ -751,59 +1180,50 @@ function initializeExtension() {
           </div>
         </div>
       </div>
-      
-      <script>
-        window.switchTab = function(tab) {
-          // Hide all tabs
-          document.getElementById('dashboard-tab').classList.remove('active');
-          document.getElementById('settings-tab').classList.remove('active');
-          
-          // Remove active class from buttons
-          document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-          
-          // Show selected tab
-          if (tab === 'dashboard') {
-            document.getElementById('dashboard-tab').classList.add('active');
-            document.querySelectorAll('.tab-btn')[0].classList.add('active');
-          } else if (tab === 'settings') {
-            document.getElementById('settings-tab').classList.add('active');
-            document.querySelectorAll('.tab-btn')[1].classList.add('active');
-          }
-        };
-        
-        window.refreshData = function() {
-          const btn = event.target;
-          btn.disabled = true;
-          btn.textContent = '⏳ Refreshing...';
-          setTimeout(() => {
-            btn.disabled = false;
-            btn.textContent = '🔄 Refresh Now';
-            loadData();
-            document.getElementById('last-updated').textContent = 'Just now';
-          }, 800);
-        };
-        
-        window.clearCache = function() {
-          chrome.storage.local.clear(() => {
-            alert('Cache cleared!');
-            loadData();
-          });
-        };
-        
-        window.logout = function() {
-          chrome.identity.clearAllCachedAuthTokens(() => {
-            chrome.storage.local.clear(() => {
-              window.location.reload();
-            });
-          });
-        };
-      </script>
     `;
     
     document.body.appendChild(sidebar);
     
     // Add scroll protection to prevent body scroll when sidebar is open
     document.body.style.overflow = "hidden";
+    
+    // CRITICAL: Bind event handlers to buttons after sidebar is created
+    setTimeout(() => {
+      // Bind tab buttons using class selector
+      const tabBtns = sidebar.querySelectorAll('.tab-btn');
+      if (tabBtns.length >= 2) {
+        tabBtns[0].onclick = () => window.switchTab('dashboard');
+        tabBtns[1].onclick = () => window.switchTab('settings');
+        console.log("✅ Tab buttons bound");
+      }
+      
+      // Bind settings buttons by finding all .settings-btn
+      const settingsBtns = sidebar.querySelectorAll('.settings-btn');
+      if (settingsBtns.length >= 3) {
+        settingsBtns[0].onclick = () => window.refreshData();
+        settingsBtns[1].onclick = () => window.clearCache();
+        settingsBtns[2].onclick = () => window.logout();
+        console.log("✅ Settings buttons bound");
+      }
+      
+      // Bind calendar link button
+      const calendarBtn = Array.from(sidebar.querySelectorAll('button')).find(btn => 
+        btn.textContent.includes('📅 Open Calendar')
+      );
+      if (calendarBtn) {
+        calendarBtn.onclick = () => window.openCalendarLink();
+        console.log("✅ Calendar link button bound");
+      }
+      
+      // Bind meeting invitation button
+      const meetingBtn = document.getElementById('send-meeting-invite-btn');
+      if (meetingBtn) {
+        meetingBtn.onclick = () => window.sendMeetingInvite();
+        console.log("✅ Meeting invitation button bound");
+      }
+      
+      console.log("✅ All event handlers bound successfully");
+    }, 50);
     
     // Close sidebar on ESC key
     const handleEsc = (e) => {
@@ -814,8 +1234,23 @@ function initializeExtension() {
     };
     document.addEventListener("keydown", handleEsc);
     
-    loadData();
+    // Setup email input Enter key listener
+    setTimeout(() => {
+      const emailInput = document.getElementById('calendar-email-input');
+      if (emailInput) {
+        emailInput.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            window.openCalendarLink();
+          }
+        });
+      }
+    }, 100);
+    
+    window.loadData();
   }
+  
+  // Make createSidebar globally accessible
+  window.createSidebar = createSidebar;
 
   function formatDateTime(dateTime) {
     try {
@@ -848,7 +1283,7 @@ function initializeExtension() {
     }
   }
 
-  function loadData() {
+  window.loadData = function() {
     chrome.runtime.sendMessage({ type: "GET_DATA" }, (response) => {
       const calendarDiv = document.getElementById("calendar");
       const gmailDiv = document.getElementById("gmail");
@@ -933,34 +1368,62 @@ function initializeExtension() {
         gmailDiv.innerHTML = '<div class="empty-state">✨ All caught up!</div>';
       }
     });
-  }
+  };
 }
 
 // Initialize when document is ready
-console.log("Google Dashboard content script loaded! readyState:", document.readyState);
+console.log("🚀 Google Dashboard Extension content script LOADED!");
+console.log("📄 Document readyState:", document.readyState);
+console.log("🌐 Current URL:", window.location.href);
+
+// Counter for initialization attempts
+let initAttempts = 0;
+const maxInitAttempts = 5;
+
+function attemptInit() {
+  initAttempts++;
+  console.log(`🔄 Initialization attempt ${initAttempts}/${maxInitAttempts}`);
+  
+  try {
+    initializeExtension();
+  } catch (err) {
+    console.error("❌ Error during initialization:", err);
+  }
+}
 
 if (document.readyState === 'loading') {
-  // DOM still loading
+  console.log("📋 DOM still loading, waiting for DOMContentLoaded...");
   document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOMContentLoaded event fired");
-    initializeExtension();
+    console.log("✅ DOMContentLoaded event fired!");
+    attemptInit();
   });
 } else if (document.readyState === 'interactive') {
-  // DOM ready but resources still loading
-  console.log("Document interactive, initializing now");
-  initializeExtension();
+  console.log("⚡ Document interactive, initializing immediately...");
+  attemptInit();
 } else {
-  // Everything loaded
-  console.log("Document complete, initializing now");
-  initializeExtension();
+  console.log("✨ Document complete, initializing immediately...");
+  attemptInit();
 }
 
-// Also initialize on document start as a fallback
-if (document.documentElement) {
-  setTimeout(() => {
-    if (!document.getElementById("google-dashboard-button")) {
-      console.log("Button not found, re-initializing...");
-      initializeExtension();
-    }
-  }, 500);
+// Fallback: Check and retry multiple times
+let retryCount = 0;
+function retryInitialization() {
+  retryCount++;
+  // Check for Shadow DOM container instead of regular DOM button
+  const shadowContainer = document.getElementById("google-dashboard-container");
+  const regularButton = document.getElementById("google-dashboard-button");
+  const button = shadowContainer || regularButton;
+  
+  if (!button && retryCount <= maxInitAttempts) {
+    console.log(`⏰ Button container not found on retry ${retryCount}/${maxInitAttempts}, retrying in 300ms...`);
+    setTimeout(retryInitialization, 300);
+  } else if (button) {
+    console.log("✅ Button is now present on the page (Shadow DOM or regular DOM)!");
+  } else if (retryCount > maxInitAttempts) {
+    console.warn("⚠️ Maximum retry attempts reached. Button may not be visible.");
+    console.warn("💡 Troubleshooting: Check console for errors during initialization");
+  }
 }
+
+// Start retry queue after a short delay
+setTimeout(retryInitialization, 100);
