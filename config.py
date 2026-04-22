@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     # ── MCP server ────────────────────────────────────────────────
     mcp_host: str = Field(default="0.0.0.0", validation_alias="MCP_HOST")
     mcp_port: int = Field(default=8001, validation_alias="MCP_PORT")
+    mcp2_host: str = Field(default="127.0.0.1", validation_alias="MCP2_HOST")
+    mcp2_port: int = Field(default=8002, validation_alias="MCP2_PORT")
 
     # ── LLM ───────────────────────────────────────────────────────
     gemini_api_key: str = Field(..., validation_alias="GEMINI_API_KEY")

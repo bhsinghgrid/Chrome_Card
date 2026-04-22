@@ -10,7 +10,7 @@ This file:
 
 import structlog
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -74,8 +74,27 @@ async def agent_chat(request: AgentChatRequest):
     Use this for integrating the autonomous calendar/email logic into Java apps.
     """
     log.info("api_request_received", message=request.message, session_id=request.session_id)
-    result = await run_agent(request.message, session_id=request.session_id)
-    return AgentChatResponse(**result)
+    try:
+        result = await run_agent(request.message, session_id=request.session_id)
+        return AgentChatResponse(**result)
+    except Exception as e:
+        # Surface a friendly error message to callers (extension + Java proxy),
+        # instead of a blank "Internal Server Error".
+        msg = str(e) or e.__class__.__name__
+        log.exception("agent_chat_failed", error=msg, session_id=request.session_id)
+
+        # Common failure: Gemini quota/spend cap exceeded.
+        if "RESOURCE_EXHAUSTED" in msg and "spending cap" in msg:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "Gemini API quota/spend cap exceeded for this project. "
+                    "Update `GEMINI_API_KEY` or increase the spend cap in Google AI Studio."
+                ),
+            )
+
+        # Generic failure.
+        raise HTTPException(status_code=500, detail="Agent error: " + msg[:400])
 
 
 @app.get("/health")

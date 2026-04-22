@@ -4,6 +4,7 @@ agent.py — The LangChain ReAct agent that uses our MCP tools.
 
 import asyncio
 import json
+import os
 from typing import Any
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -38,13 +39,15 @@ RULES YOU MUST FOLLOW:
 5. Always be explicit about what you are about to do and why.
 6. If the user asks for their own availability/slots without specifying other attendees, you can check their own calendar by passing 'primary' as the single attendee in list.
 7. NEW: If the user wants to revert or cancel their last action (like a meeting they just created or an email they just sent), use the tool_undo_last_action.
+8. If the user request is ONLY about Calendar/Gmail, do NOT call Email MCP directory/workflow tools (employee_list, resolve_recipients, start_email_send, etc.).
+9. If the user request is ONLY about Email MCP directory/workflows, do NOT call Calendar/Gmail tools (tool_get_events, tool_check_free_slots, etc.).
 """
 
 
 # ─── Human approval tool ──────────────────────────────────────────────────────
 
 import httpx
-JAVA_BACKEND_URL = "http://localhost:8080"
+JAVA_BACKEND_URL = os.environ.get("JAVA_BACKEND_URL", "http://localhost:8080").rstrip("/")
 
 def request_approval(action_type: str, description: str, payload: str) -> str:
     try:
@@ -84,12 +87,19 @@ async def build_agent() -> Any:
     if _agent_cache is not None:
         return _agent_cache
 
-    log.info("connecting_to_mcp_server", url=f"http://localhost:{settings.mcp_port}/mcp")
+    mcp1_sse_url = f"http://127.0.0.1:{settings.mcp_port}/mcp/sse"
+    mcp2_sse_url = f"http://{settings.mcp2_host}:{settings.mcp2_port}/mcp/sse"
+
+    log.info("connecting_to_mcp_servers", mcp1=mcp1_sse_url, mcp2=mcp2_sse_url)
 
     mcp_client = MultiServerMCPClient(
         {
             "calendar_gmail": {
-                "url": f"http://localhost:{settings.mcp_port}/mcp/sse",
+                "url": mcp1_sse_url,
+                "transport": "sse",
+            },
+            "email_mcp": {
+                "url": mcp2_sse_url,
                 "transport": "sse",
             }
         }
@@ -136,12 +146,11 @@ async def build_agent() -> Any:
     return _agent_cache
 
 
-async def run_agent(user_message: str, agent: Any = None) -> dict[str, Any]:
+async def run_agent(user_message: str, session_id: str = "session_default", agent: Any = None) -> dict[str, Any]:
     if agent is None:
         agent = await build_agent()
 
     log.info("agent_run_start", message=user_message)
-    session_id = "session_1"
     config = {"configurable": {"thread_id": session_id}}
     
     try:
@@ -149,7 +158,7 @@ async def run_agent(user_message: str, agent: Any = None) -> dict[str, Any]:
     except Exception as e:
         if "INVALID_CHAT_HISTORY" in str(e) or "tool_calls" in str(e):
             log.warning("corrupted_history_detected", error=str(e))
-            session_id = f"session_{datetime.now().timestamp()}"
+            session_id = f"{session_id}_{datetime.now().timestamp()}"
             config["configurable"]["thread_id"] = session_id
             result = await agent.ainvoke({"messages": [HumanMessage(content=user_message)]}, config)
         else:
@@ -208,7 +217,7 @@ async def run_agent(user_message: str, agent: Any = None) -> dict[str, Any]:
                 tool_steps.append({"tool": tc.get("name"), "input": str(tc.get("args"))})
 
     log.info("agent_run_complete", steps=len(tool_steps))
-    return {"answer": final_answer, "steps": tool_steps}
+    return {"answer": final_answer, "steps": tool_steps, "session_id": session_id}
 
 if __name__ == "__main__":
     async def main():

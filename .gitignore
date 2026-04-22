@@ -16,6 +16,8 @@ token.json
 
 # Virtual environments
 .venv
+.venv-mcp
 .env
 
+.DS_Store
 

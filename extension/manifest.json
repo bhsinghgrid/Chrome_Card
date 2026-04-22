@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Google Dashboard Sidebar",
+  "version": "1.0.0",
+  "description": "Calendar + Gmail sidebar dashboard",
+  "permissions": [
+    "storage",
+    "identity",
+    "activeTab",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://www.googleapis.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "js/background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "js/content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "js/api.js",
+        "js/auth.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "oauth2": {
+    "client_id": "472515862729-fnco2pdicbcbpl9ve284s8dlbqg6aqe1.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/calendar.readonly",
+      "https://www.googleapis.com/auth/calendar",
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.send"
+    ]
+  }
+}

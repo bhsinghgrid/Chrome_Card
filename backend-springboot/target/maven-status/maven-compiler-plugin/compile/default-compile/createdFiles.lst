@@ -1,0 +1,10 @@
+com/example/app/mcp/PythonMcpServer2.class
+com/example/app/mcp/CalendarMcp2Properties.class
+com/example/app/controller/GoogleController.class
+com/example/app/mcp/CalendarMcpProperties.class
+com/example/app/mcp/CalendarMcpAutoStarter.class
+com/example/app/mcp/PythonMcpServer.class
+com/example/app/Application.class
+com/example/app/mcp/CalendarMcp2ProxyController.class
+com/example/app/mcp/CalendarMcpProxyController.class
+com/example/app/mcp/CalendarMcp2AutoStarter.class
